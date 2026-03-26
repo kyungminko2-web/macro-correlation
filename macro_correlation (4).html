@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>글로벌 매크로 상관관계 분석기</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0e15;--sf:#141720;--sf2:#1b2030;
+  --bd:rgba(255,255,255,0.07);--bd2:rgba(255,255,255,0.14);
+  --t1:#dce0e8;--t2:#7a7f8e;--t3:#3d4251;
+  --sp:#4d9de0;--yi:#e05252;--go:#f0b429;--oi:#a0a0a0;--m2:#3bb273;--un:#a98ccc;
+  --r:8px;--rl:12px;
+}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;min-height:100vh}
+.wrap{max-width:980px;margin:0 auto;padding:28px 24px 80px}
+
+.hdr{margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--bd)}
+.hdr h1{font-size:21px;font-weight:500;letter-spacing:-0.4px;margin-bottom:5px}
+.hdr p{font-size:12px;color:var(--t2);line-height:1.5}
+
+.ctrl-row{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:18px;align-items:flex-end}
+.ctrl-grp{display:flex;flex-direction:column;gap:5px}
+.ctrl-lbl{font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+.ctrl-grp select{background:var(--sf);border:1px solid var(--bd2);color:var(--t1);padding:7px 10px;border-radius:var(--r);font-family:inherit;font-size:13px;cursor:pointer;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7f8e'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.ctrl-grp select:focus{outline:none;border-color:var(--sp)}
+
+.ind-section{margin-bottom:20px}
+.ind-section .ctrl-lbl{margin-bottom:8px;display:block}
+.ind-row{display:flex;flex-wrap:wrap;gap:7px}
+.ind-toggle{display:flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;border:1px solid var(--bd2);background:var(--sf);cursor:pointer;font-size:12px;color:var(--t2);transition:all .15s;user-select:none}
+.ind-toggle .dot{width:7px;height:7px;border-radius:50%;background:var(--t3);transition:background .15s;flex-shrink:0}
+.ind-toggle.on{background:rgba(255,255,255,0.04);border-color:var(--ic);color:var(--t1)}
+.ind-toggle.on .dot{background:var(--ic)}
+
+.stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:22px}
+.scard{background:var(--sf);border-radius:var(--r);padding:11px 12px;border:1px solid var(--bd);opacity:.35;transition:opacity .2s}
+.scard.active{opacity:1}
+.scard-lbl{font-size:10px;color:var(--t2);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scard-val{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;color:var(--t1)}
+.scard-chg{font-size:10px;margin-top:3px;font-family:'JetBrains Mono',monospace}
+
+.tabs{display:flex;border-bottom:1px solid var(--bd);margin-bottom:22px;gap:0}
+.tab-btn{padding:9px 16px;background:none;border:none;color:var(--t2);font-family:inherit;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap}
+.tab-btn:hover{color:var(--t1)}
+.tab-btn.active{color:var(--t1);font-weight:500;border-bottom-color:var(--t1)}
+.tab-pane{display:none}.tab-pane.active{display:block}
+
+.interp{background:#1a2035;border:1px solid rgba(255,255,255,0.12);border-left:3px solid #4d9de0;border-radius:0 var(--r) var(--r) 0;padding:16px 18px;margin-bottom:20px;font-size:12.5px;line-height:1.9;color:#a8b0c0}
+.interp strong{color:#dce0e8;font-weight:500}
+.interp-sub{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.07);font-size:11.5px;color:#7a7f8e}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;margin-bottom:4px}
+.chip{padding:2px 9px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500}
+
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:10px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--t2)}
+.leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+.chart-wrap{position:relative;width:100%}
+
+.mtbl-wrap{overflow-x:auto;margin-bottom:8px}
+.mtbl{border-collapse:collapse;font-size:12px;min-width:100%}
+.mtbl th{padding:9px 12px;font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--t2);background:var(--sf);border:1px solid var(--bd);white-space:nowrap}
+.mtbl td{padding:9px 14px;text-align:center;border:1px solid var(--bd);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;white-space:nowrap}
+.mtbl .rl{text-align:left;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;color:var(--t1);background:var(--sf)}
+
+.pair-row{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.pair-row .ctrl-lbl{font-size:11px;color:var(--t2);text-transform:none;letter-spacing:0;white-space:nowrap}
+.pair-row select{background:var(--sf);border:1px solid var(--bd2);color:var(--t1);padding:6px 28px 6px 10px;border-radius:var(--r);font-family:inherit;font-size:12px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7f8e'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+.pair-row select:focus{outline:none;border-color:var(--sp)}
+
+.section-title{font-size:13px;font-weight:500;margin-bottom:10px;color:var(--t1)}
+.empty-state{padding:40px;text-align:center;color:var(--t2);font-size:13px;background:var(--sf);border-radius:var(--rl);border:1px solid var(--bd)}
+.note{font-size:10px;color:var(--t3);margin-top:8px;line-height:1.5}
+.divider{border:none;border-top:1px solid var(--bd);margin:20px 0}
+
+@media(max-width:640px){
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tab-btn{padding:8px 10px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hdr">
+  <h1>글로벌 매크로 상관관계 분석기</h1>
+  <p>1970–2025 연간 데이터 기반 · 지표 선택 후 상관관계·롤링 계수·산점도 분석<br>
+  * Global M2는 주요국 통화량 합산 추정치. 분석 목적의 참고 데이터로 활용 권장</p>
+</div>
+
+<div class="ctrl-row">
+  <div class="ctrl-grp">
+    <span class="ctrl-lbl">시작 연도</span>
+    <select id="startY"></select>
+  </div>
+  <div class="ctrl-grp">
+    <span class="ctrl-lbl">종료 연도</span>
+    <select id="endY"></select>
+  </div>
+  <div class="ctrl-grp">
+    <span class="ctrl-lbl">롤링 윈도우</span>
+    <select id="rwSel">
+      <option value="5" selected>5년</option>
+      <option value="10">10년</option>
+      <option value="20">20년</option>
+    </select>
+  </div>
+</div>
+
+<div class="ind-section">
+  <span class="ctrl-lbl">지표 선택 (최소 2개)</span>
+  <div class="ind-row" id="indRow"></div>
+</div>
+
+<div class="stats" id="statsGrid"></div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="trend">가격 추이</button>
+  <button class="tab-btn" data-tab="matrix">상관관계 매트릭스</button>
+  <button class="tab-btn" data-tab="rolling">롤링 상관계수</button>
+  <button class="tab-btn" data-tab="scatter">산점도</button>
+</div>
+
+<div id="trend" class="tab-pane active">
+  <div class="legend" id="trendLegend"></div>
+  <div class="chart-wrap" style="height:320px"><canvas id="trendC"></canvas></div>
+  <p class="note">* 모든 지표 선택 기간 첫해 = 100 기준 정규화. 툴팁에서 실제 수치 확인 가능</p>
+</div>
+
+<div id="matrix" class="tab-pane">
+  <div class="interp">
+    <strong>📊 상관관계 매트릭스 읽는 법</strong><br><br>
+    상관계수(r)는 두 지표의 <strong>연간 변화율이 같은 방향으로 움직이는 정도</strong>를 −1에서 +1 사이 숫자로 표현합니다. 절대 가격 수준이 아닌, 변화의 동조성을 측정합니다.
+    <div class="chips" style="margin-top:10px">
+      <span class="chip" style="background:rgba(77,157,224,0.25);color:#7ec8f5">r &gt; +0.7 — 강한 양의 상관</span>
+      <span class="chip" style="background:rgba(77,157,224,0.12);color:#7ec8f5">+0.3 ~ +0.7 — 중간 양의 상관</span>
+      <span class="chip" style="background:rgba(255,255,255,0.09);color:#7a7f8e">−0.3 ~ +0.3 — 관계 미약</span>
+      <span class="chip" style="background:rgba(224,82,82,0.12);color:#f08080">−0.7 ~ −0.3 — 중간 음의 상관</span>
+      <span class="chip" style="background:rgba(224,82,82,0.25);color:#f08080">r &lt; −0.7 — 강한 음의 상관</span>
+    </div>
+    <div class="interp-sub">
+      <strong>양의 상관(파란색)</strong> — 두 자산이 같이 오르내림. 분산 효과 없음. 예: 주식↑ 때 유가도↑ → 경기 동반 민감도<br>
+      <strong>음의 상관(빨간색)</strong> — 한쪽이 오를 때 다른 쪽은 내림. <strong>헤지 자산으로 활용 가능</strong>. 예: 금↑ 때 주식↓ → 위험회피 국면<br>
+      <strong>주의</strong> — 상관관계는 인과관계가 아닙니다. 두 지표가 함께 움직이는 것이 관찰될 뿐, 한쪽이 다른 쪽을 일으키는 게 아닐 수 있습니다.
+    </div>
+  </div>
+  <div class="mtbl-wrap" id="matrixWrap"></div>
+  <p class="note">* 금리·실업률은 전년 대비 변화폭(%p), 나머지는 전년 대비 수익률(%) 기준 피어슨 상관계수</p>
+</div>
+
+<div id="rolling" class="tab-pane">
+  <div class="interp">
+    <strong>📈 롤링 상관계수 읽는 법</strong><br><br>
+    같은 두 자산이라도 경제 환경이 바뀌면 상관관계가 달라집니다. 롤링 상관계수는 <strong>N년짜리 창(window)을 1년씩 앞으로 밀면서</strong> 매 시점의 상관계수를 계산해, 관계가 시간에 따라 어떻게 변해왔는지 보여줍니다.
+    <div class="interp-sub">
+      <strong>선이 0선을 위로 유지</strong> → 지속적 양의 상관 (함께 오르내리는 관계)<br>
+      <strong>선이 0선 아래로 하락</strong> → 관계가 역전됨 (한쪽이 오를 때 다른 쪽은 하락)<br>
+      <strong>선이 0선 부근에서 진동</strong> → 뚜렷한 구조적 관계 없음, 구간마다 다름<br>
+      <strong>급격한 꺾임 시점</strong> → 정책 체제 전환(예: 닷컴버블·금융위기·코로나), 구조적 변화 신호<br><br>
+      <strong>실제 사례</strong> — S&P500 ↔ 금리: 1980~90년대엔 양의 상관(경기 호황 = 주가↑ + 금리↑)이었다가, 2000년대 이후 음의 상관으로 전환. 경기 침체 시 연준이 금리를 인하하면서 주가와 금리가 함께 하락하는 <strong>Fed 풋</strong> 구조가 정착된 결과입니다.
+    </div>
+  </div>
+  <div class="pair-row">
+    <span class="ctrl-lbl">지표 A</span>
+    <select id="rA"></select>
+    <span class="ctrl-lbl" style="padding:0 4px">vs</span>
+    <span class="ctrl-lbl">지표 B</span>
+    <select id="rB"></select>
+  </div>
+  <div class="section-title" id="rollingTitle"></div>
+  <div id="rollingEmpty" class="empty-state" style="display:none">지표를 2개 이상 선택하면 분석이 표시됩니다</div>
+  <div class="chart-wrap" style="height:250px"><canvas id="rollingC"></canvas></div>
+</div>
+
+<div id="scatter" class="tab-pane">
+  <div class="interp">
+    <strong>🔵 산점도 읽는 법</strong><br><br>
+    각 점 하나 = 특정 연도의 두 지표 연간 변화율 조합. 점들의 배열 패턴과 추세선 기울기로 관계를 직관적으로 파악할 수 있습니다.
+    <div class="interp-sub">
+      <strong>점들이 우상향으로 퍼짐</strong> → 양의 상관. A가 오를 때 B도 오르는 경향<br>
+      <strong>점들이 우하향으로 퍼짐</strong> → 음의 상관. A가 오를 때 B는 내리는 경향<br>
+      <strong>점들이 원형으로 퍼짐</strong> → 상관 없음. 두 지표는 독립적으로 움직임<br>
+      <strong>추세선에서 멀리 벗어난 점</strong> → 평균적 관계가 깨진 극단적 사건 연도.<br>
+      &nbsp;&nbsp;&nbsp;예: 2008(금융위기), 2020(코로나), 1980(오일쇼크 정점)<br>
+      <strong>r값(상관계수)</strong> — 추세선 제목 옆에 표시. 0에 가까울수록 관계가 약하고, ±1에 가까울수록 강합니다.<br><br>
+      <strong>활용 팁</strong> — 기간을 좁혀 특정 시대(예: 2000~2010)만 보면 금융위기 전후 관계가 어떻게 달랐는지 확인할 수 있습니다.
+    </div>
+  </div>
+  <div class="pair-row">
+    <span class="ctrl-lbl">지표 A</span>
+    <select id="sA"></select>
+    <span class="ctrl-lbl" style="padding:0 4px">vs</span>
+    <span class="ctrl-lbl">지표 B</span>
+    <select id="sB"></select>
+  </div>
+  <div class="section-title" id="scatterTitle"></div>
+  <div id="scatterEmpty" class="empty-state" style="display:none">지표를 2개 이상 선택하면 분석이 표시됩니다</div>
+  <div class="chart-wrap" style="height:340px"><canvas id="scatterC"></canvas></div>
+</div>
+
+</div>
+
+<script>
+Chart.defaults.color = '#7a7f8e';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+
+const DATA = [
+  {y:1970,s:92.15,r:6.59,g:37.44,o:1.80,m:2.8,u:4.9},
+  {y:1971,s:102.09,r:5.89,g:43.48,o:2.18,m:3.1,u:5.9},
+  {y:1972,s:118.05,r:6.42,g:63.84,o:2.48,m:3.5,u:5.6},
+  {y:1973,s:97.55,r:6.74,g:106.48,o:9.61,m:3.9,u:4.9},
+  {y:1974,s:68.56,r:7.43,g:183.77,o:10.73,m:4.3,u:5.6},
+  {y:1975,s:90.19,r:7.76,g:140.25,o:10.38,m:4.8,u:8.5},
+  {y:1976,s:107.46,r:6.87,g:134.75,o:12.80,m:5.4,u:7.7},
+  {y:1977,s:95.10,r:7.78,g:164.95,o:14.40,m:6.0,u:7.1},
+  {y:1978,s:96.11,r:9.15,g:208.10,o:14.55,m:6.7,u:6.1},
+  {y:1979,s:107.94,r:10.39,g:512.00,o:25.10,m:7.4,u:5.8},
+  {y:1980,s:135.76,r:12.43,g:589.50,o:37.42,m:8.2,u:7.1},
+  {y:1981,s:122.55,r:13.72,g:400.00,o:35.24,m:8.8,u:7.6},
+  {y:1982,s:140.64,r:10.54,g:448.00,o:31.83,m:9.4,u:9.7},
+  {y:1983,s:164.93,r:11.83,g:382.40,o:29.30,m:10.5,u:9.6},
+  {y:1984,s:167.24,r:11.55,g:309.00,o:28.78,m:11.3,u:7.5},
+  {y:1985,s:211.28,r:9.01,g:326.55,o:26.73,m:12.4,u:7.2},
+  {y:1986,s:242.17,r:7.11,g:391.00,o:15.10,m:13.3,u:7.0},
+  {y:1987,s:247.08,r:8.83,g:486.50,o:17.24,m:14.0,u:6.2},
+  {y:1988,s:277.72,r:9.11,g:410.25,o:16.32,m:15.0,u:5.5},
+  {y:1989,s:353.40,r:7.93,g:401.00,o:21.10,m:16.2,u:5.3},
+  {y:1990,s:330.22,r:8.08,g:391.00,o:25.23,m:17.5,u:5.6},
+  {y:1991,s:417.09,r:6.71,g:361.00,o:19.00,m:18.8,u:6.8},
+  {y:1992,s:435.71,r:6.69,g:332.90,o:19.25,m:20.2,u:7.5},
+  {y:1993,s:466.45,r:5.83,g:391.75,o:14.50,m:21.8,u:6.9},
+  {y:1994,s:459.27,r:7.81,g:379.00,o:17.05,m:22.9,u:6.1},
+  {y:1995,s:615.93,r:5.58,g:387.00,o:18.35,m:24.8,u:5.6},
+  {y:1996,s:740.74,r:6.44,g:369.00,o:25.22,m:26.7,u:5.4},
+  {y:1997,s:970.43,r:5.74,g:289.20,o:17.72,m:28.2,u:4.9},
+  {y:1998,s:1229.23,r:4.65,g:287.80,o:10.72,m:30.6,u:4.5},
+  {y:1999,s:1469.25,r:6.45,g:290.25,o:25.60,m:33.4,u:4.2},
+  {y:2000,s:1320.28,r:5.11,g:273.60,o:28.44,m:35.8,u:4.0},
+  {y:2001,s:1148.08,r:5.05,g:278.90,o:19.39,m:38.5,u:4.7},
+  {y:2002,s:879.82,r:3.83,g:349.30,o:31.20,m:42.0,u:5.8},
+  {y:2003,s:1111.92,r:4.27,g:415.45,o:32.52,m:47.2,u:6.0},
+  {y:2004,s:1211.92,r:4.22,g:437.00,o:43.45,m:53.0,u:5.5},
+  {y:2005,s:1248.29,r:4.39,g:513.00,o:61.04,m:57.5,u:5.1},
+  {y:2006,s:1418.30,r:4.71,g:635.70,o:61.05,m:63.0,u:4.6},
+  {y:2007,s:1468.36,r:4.03,g:838.00,o:95.62,m:73.0,u:4.6},
+  {y:2008,s:903.25,r:2.22,g:866.00,o:41.12,m:78.0,u:5.8},
+  {y:2009,s:1115.10,r:3.84,g:1096.35,o:74.47,m:82.0,u:9.3},
+  {y:2010,s:1257.64,r:3.29,g:1421.40,o:91.38,m:87.0,u:9.6},
+  {y:2011,s:1257.60,r:1.88,g:1574.50,o:98.83,m:96.0,u:8.9},
+  {y:2012,s:1426.19,r:1.76,g:1657.50,o:91.82,m:104.0,u:8.1},
+  {y:2013,s:1848.36,r:3.03,g:1201.50,o:98.42,m:108.0,u:7.4},
+  {y:2014,s:2058.90,r:2.17,g:1186.00,o:53.45,m:107.0,u:6.2},
+  {y:2015,s:2043.94,r:2.27,g:1060.00,o:37.13,m:98.0,u:5.3},
+  {y:2016,s:2238.83,r:2.44,g:1152.00,o:53.72,m:100.0,u:4.9},
+  {y:2017,s:2673.61,r:2.41,g:1305.00,o:60.42,m:111.0,u:4.4},
+  {y:2018,s:2506.85,r:2.69,g:1279.00,o:45.41,m:107.0,u:3.9},
+  {y:2019,s:3230.78,r:1.92,g:1523.00,o:61.06,m:113.0,u:3.7},
+  {y:2020,s:3756.07,r:0.93,g:1887.60,o:48.52,m:130.0,u:8.1},
+  {y:2021,s:4766.18,r:1.52,g:1806.40,o:75.21,m:149.0,u:5.4},
+  {y:2022,s:3839.50,r:3.88,g:1823.50,o:80.48,m:145.0,u:3.6},
+  {y:2023,s:4769.83,r:3.88,g:2063.73,o:71.42,m:148.0,u:3.6},
+  {y:2024,s:5881.63,r:4.57,g:2625.47,o:69.96,m:155.0,u:4.0},
+  {y:2025,s:5703.00,r:4.32,g:3050.00,o:72.50,m:163.0,u:4.1}
+];
+
+const IND = {
+  sp500: {label:'S&P 500',   key:'s', color:'#4d9de0', changeType:'pct', fmt:v=>v>=1000?v.toLocaleString('en',{maximumFractionDigits:0}):v.toFixed(0), fmtC:v=>(v>=0?'+':'')+v.toFixed(1)+'%', unit:'pts'},
+  yield: {label:'미국채 10Y',key:'r', color:'#e05252', changeType:'abs', fmt:v=>v.toFixed(2)+'%',  fmtC:v=>(v>=0?'+':'')+v.toFixed(2)+'%p', unit:'%'},
+  gold:  {label:'금',        key:'g', color:'#f0b429', changeType:'pct', fmt:v=>'$'+v.toLocaleString('en',{maximumFractionDigits:0}), fmtC:v=>(v>=0?'+':'')+v.toFixed(1)+'%', unit:'$/oz'},
+  oil:   {label:'WTI 유가',  key:'o', color:'#a0a0a0', changeType:'pct', fmt:v=>'$'+v.toFixed(1), fmtC:v=>(v>=0?'+':'')+v.toFixed(1)+'%', unit:'$/bbl'},
+  m2:    {label:'Global M2', key:'m', color:'#3bb273', changeType:'pct', fmt:v=>'$'+v.toFixed(0)+'T', fmtC:v=>(v>=0?'+':'')+v.toFixed(1)+'%', unit:'조 달러'},
+  unemp: {label:'실업률',    key:'u', color:'#a98ccc', changeType:'abs', fmt:v=>v.toFixed(1)+'%',  fmtC:v=>(v>=0?'+':'')+v.toFixed(2)+'%p', unit:'%'}
+};
+
+// State
+let selected = new Set(['sp500','yield','gold','oil','m2','unemp']);
+let startY=1970, endY=2025, rw=5;
+let pairRA='sp500', pairRB='yield';
+let pairSA='sp500', pairSB='yield';
+let activeTab='trend';
+let charts={};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function sliceData(s,e){return DATA.filter(d=>d.y>=s&&d.y<=e)}
+
+function getChanges(arr){
+  const out=[];
+  for(let i=1;i<arr.length;i++){
+    const c=arr[i],p=arr[i-1];
+    const row={y:c.y};
+    Object.entries(IND).forEach(([id,cfg])=>{
+      row[id]=cfg.changeType==='pct'?(c[cfg.key]-p[cfg.key])/p[cfg.key]*100:c[cfg.key]-p[cfg.key];
+    });
+    out.push(row);
+  }
+  return out;
+}
+
+function pcc(xs,ys){
+  const n=xs.length;if(n<3)return NaN;
+  const mx=xs.reduce((a,b)=>a+b)/n, my=ys.reduce((a,b)=>a+b)/n;
+  let num=0,dx=0,dy=0;
+  for(let i=0;i<n;i++){num+=(xs[i]-mx)*(ys[i]-my);dx+=(xs[i]-mx)**2;dy+=(ys[i]-my)**2;}
+  return dx&&dy?num/Math.sqrt(dx*dy):0;
+}
+
+function mxClr(c){
+  if(isNaN(c))return{bg:'transparent',tc:'#7a7f8e'};
+  if(c>=.7)return{bg:'rgba(77,157,224,0.22)',tc:'#4d9de0'};
+  if(c>=.3)return{bg:'rgba(77,157,224,0.10)',tc:'#4d9de0'};
+  if(c<=-0.7)return{bg:'rgba(224,82,82,0.22)',tc:'#e05252'};
+  if(c<=-0.3)return{bg:'rgba(224,82,82,0.10)',tc:'#e05252'};
+  return{bg:'transparent',tc:'#7a7f8e'};
+}
+
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function mkChart(id,cfg){destroyChart(id);charts[id]=new Chart(document.getElementById(id),cfg);}
+
+// ── Render Stats ──────────────────────────────────────────────────────────────
+function renderStats(){
+  const sl=sliceData(startY,endY);
+  const ch=getChanges(sl);
+  const last=sl[sl.length-1];
+  const ids=Object.keys(IND);
+  document.getElementById('statsGrid').innerHTML=ids.map(id=>{
+    const cfg=IND[id];
+    const vals=ch.map(d=>d[id]);
+    const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const pos=avg>=0;
+    const on=selected.has(id);
+    return`<div class="scard${on?' active':''}" style="border-top:2px solid ${on?cfg.color:'transparent'}">
+      <div class="scard-lbl">${cfg.label}</div>
+      <div class="scard-val" style="color:${on?cfg.color:'#7a7f8e'}">${cfg.fmt(last[cfg.key])}</div>
+      <div class="scard-chg" style="color:${on?(pos?'#3bb273':'#e05252'):'#454a57'}">${pos?'▲':'▼'} 연평균 ${Math.abs(avg).toFixed(1)}${cfg.changeType==='pct'?'%':'%p'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render Trend Chart ─────────────────────────────────────────────────────────
+const RIGHT_AXIS_IDS = new Set(['yield','unemp']);
+
+function renderTrend(){
+  const sl=sliceData(startY,endY);
+  const labs=sl.map(d=>d.y);
+  const selIds=Object.keys(IND).filter(id=>selected.has(id));
+  const hasRight=selIds.some(id=>RIGHT_AXIS_IDS.has(id));
+
+  // Legend
+  document.getElementById('trendLegend').innerHTML=selIds.map(id=>{
+    const cfg=IND[id];
+    const side=RIGHT_AXIS_IDS.has(id)?'우축·%':'좌축·정규화';
+    return`<div class="leg-item"><div class="leg-dot" style="background:${cfg.color}${RIGHT_AXIS_IDS.has(id)?';border:1px dashed '+cfg.color:''}"></div>${cfg.label}<span style="font-size:9px;color:#3d4251;margin-left:2px">(${side})</span></div>`;
+  }).join('');
+
+  const datasets=selIds.map(id=>{
+    const cfg=IND[id];
+    const isRight=RIGHT_AXIS_IDS.has(id);
+    const data=isRight
+      ? sl.map(d=>+d[cfg.key].toFixed(2))
+      : sl.map(d=>+((d[cfg.key]/sl[0][cfg.key])*100).toFixed(2));
+    return{
+      label:cfg.label,data,borderColor:cfg.color,backgroundColor:'transparent',
+      pointRadius:0,borderWidth:isRight?1.5:1.8,
+      borderDash:isRight?[5,3]:undefined,
+      yAxisID:isRight?'yR':'yL',
+      tooltip:{callbacks:{label:c=>`${cfg.label}: ${cfg.fmt(sl[c.dataIndex][cfg.key])}`}}
+    };
+  });
+
+  const scales={
+    x:{ticks:{maxTicksLimit:14,font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+    yL:{type:'linear',position:'left',
+      ticks:{font:{size:10},callback:v=>v.toFixed(0)},
+      grid:{color:'rgba(255,255,255,0.05)'},
+      title:{display:true,text:'정규화 (시작=100)',font:{size:9},color:'#7a7f8e'}
+    }
+  };
+  if(hasRight){
+    scales.yR={type:'linear',position:'right',
+      ticks:{font:{size:10},color:'#b4a0d0',callback:v=>v.toFixed(1)+'%'},
+      grid:{drawOnChartArea:false},
+      title:{display:true,text:'금리·실업률 (%)',font:{size:9},color:'#b4a0d0'}
+    };
+  }
+
+  mkChart('trendC',{type:'line',data:{labels:labs,datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(20,23,32,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:10,titleFont:{family:'DM Sans',size:12},bodyFont:{family:'JetBrains Mono',size:11}}},
+      scales
+    }
+  });
+}
+
+// ── Render Matrix ─────────────────────────────────────────────────────────────
+function renderMatrix(){
+  const selIds=Object.keys(IND).filter(id=>selected.has(id));
+  if(selIds.length<2){
+    document.getElementById('matrixWrap').innerHTML='<div class="empty-state">지표를 2개 이상 선택해 주세요</div>';
+    return;
+  }
+  const sl=sliceData(startY,endY);
+  const ch=getChanges(sl);
+  let html='<table class="mtbl"><thead><tr><th></th>';
+  selIds.forEach(id=>{html+=`<th style="color:${IND[id].color}">${IND[id].label}</th>`;});
+  html+='</tr></thead><tbody>';
+  selIds.forEach(rid=>{
+    html+=`<tr><td class="rl" style="color:${IND[rid].color}">${IND[rid].label}</td>`;
+    selIds.forEach(cid=>{
+      if(rid===cid){html+=`<td style="background:rgba(255,255,255,0.04);color:#454a57">—</td>`;}
+      else{
+        const r=pcc(ch.map(d=>d[rid]),ch.map(d=>d[cid]));
+        const {bg,tc}=mxClr(r);
+        html+=`<td style="background:${bg};color:${tc}">${r.toFixed(2)}</td>`;
+      }
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('matrixWrap').innerHTML=html;
+}
+
+// ── Render Rolling ────────────────────────────────────────────────────────────
+function updatePairSelects(){
+  const selIds=Object.keys(IND).filter(id=>selected.has(id));
+  ['rA','rB','sA','sB'].forEach(id=>{
+    const el=document.getElementById(id);
+    const cur=el.value;
+    el.innerHTML=selIds.map(sid=>`<option value="${sid}"${sid===cur?' selected':''}>${IND[sid].label}</option>`).join('');
+  });
+  // Ensure A≠B
+  if(document.getElementById('rA').value===document.getElementById('rB').value && selIds.length>1){
+    const idx=selIds.indexOf(document.getElementById('rA').value);
+    document.getElementById('rB').value=selIds[(idx+1)%selIds.length];
+  }
+  if(document.getElementById('sA').value===document.getElementById('sB').value && selIds.length>1){
+    const idx=selIds.indexOf(document.getElementById('sA').value);
+    document.getElementById('sB').value=selIds[(idx+1)%selIds.length];
+  }
+  pairRA=document.getElementById('rA').value;
+  pairRB=document.getElementById('rB').value;
+  pairSA=document.getElementById('sA').value;
+  pairSB=document.getElementById('sB').value;
+}
+
+function renderRolling(){
+  const selIds=Object.keys(IND).filter(id=>selected.has(id));
+  const empty=document.getElementById('rollingEmpty');
+  const canvas=document.getElementById('rollingC');
+  if(selIds.length<2){empty.style.display='block';canvas.style.display='none';return;}
+  empty.style.display='none';canvas.style.display='block';
+  const sl=sliceData(startY,endY);
+  const ch=getChanges(sl);
+  const ka=pairRA, kb=pairRB;
+  const rolls=[];
+  for(let i=rw;i<=ch.length;i++){
+    const seg=ch.slice(i-rw,i);
+    rolls.push({y:ch[i-1].y,c:+pcc(seg.map(d=>d[ka]),seg.map(d=>d[kb])).toFixed(3)});
+  }
+  document.getElementById('rollingTitle').textContent=`롤링 ${rw}년 상관계수: ${IND[ka].label} ↔ ${IND[kb].label}`;
+  const posData=rolls.map(r=>({x:r.y,y:r.c>=0?r.c:NaN}));
+  const negData=rolls.map(r=>({x:r.y,y:r.c<0?r.c:NaN}));
+  mkChart('rollingC',{type:'line',
+    data:{labels:rolls.map(r=>r.y),datasets:[
+      {data:rolls.map(r=>r.c),borderColor:IND[ka].color,backgroundColor:'rgba(255,255,255,0.04)',fill:true,pointRadius:2.5,pointBackgroundColor:IND[ka].color,borderWidth:2,tension:.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(20,23,32,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:10,callbacks:{label:c=>`r = ${c.parsed.y.toFixed(3)}`}}},
+      scales:{
+        x:{ticks:{maxTicksLimit:12,font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{min:-1,max:1,
+          ticks:{stepSize:.5,font:{size:10},callback:v=>v.toFixed(1)},
+          grid:{color:ctx=>ctx.tick.value===0?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.05)'}
+        }
+      }
+    }
+  });
+}
+
+// ── Render Scatter ────────────────────────────────────────────────────────────
+function renderScatter(){
+  const selIds=Object.keys(IND).filter(id=>selected.has(id));
+  const empty=document.getElementById('scatterEmpty');
+  const canvas=document.getElementById('scatterC');
+  if(selIds.length<2){empty.style.display='block';canvas.style.display='none';return;}
+  empty.style.display='none';canvas.style.display='block';
+  const sl=sliceData(startY,endY);
+  const ch=getChanges(sl);
+  const ka=pairSA, kb=pairSB;
+  const xs=ch.map(d=>+d[ka].toFixed(2)), ys=ch.map(d=>+d[kb].toFixed(2));
+  const n=xs.length;
+  const mx=xs.reduce((a,b)=>a+b)/n, my=ys.reduce((a,b)=>a+b)/n;
+  let num=0,dx=0;
+  xs.forEach((x,i)=>{num+=(x-mx)*(ys[i]-my);dx+=(x-mx)**2;});
+  const sl2=dx?num/dx:0, int2=my-sl2*mx;
+  const xmn=Math.min(...xs), xmx=Math.max(...xs);
+  const cr=pcc(xs,ys);
+  document.getElementById('scatterTitle').textContent=`${IND[ka].label} vs ${IND[kb].label} · r = ${cr.toFixed(3)}`;
+  const xPad=(xmx-xmn)*.08;
+  mkChart('scatterC',{type:'scatter',
+    data:{datasets:[
+      {label:'연도',data:ch.map((d,i)=>({x:xs[i],y:ys[i],yr:d.y})),
+       backgroundColor:IND[ka].color+'99',borderColor:IND[ka].color,borderWidth:1,pointRadius:5,pointHoverRadius:7},
+      {label:'추세선',data:[{x:xmn-xPad,y:sl2*(xmn-xPad)+int2},{x:xmx+xPad,y:sl2*(xmx+xPad)+int2}],
+       type:'line',borderColor:'#e05252',backgroundColor:'transparent',borderWidth:1.5,borderDash:[5,3],pointRadius:0,order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(20,23,32,0.95)',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,padding:10,
+        callbacks:{label:c=>{
+          if(!c.raw.yr)return null;
+          const xu=IND[ka].changeType==='pct'?'%':'%p';
+          const yu=IND[kb].changeType==='pct'?'%':'%p';
+          return`${c.raw.yr}년  ${IND[ka].label}: ${Number(c.raw.x).toFixed(1)}${xu}  /  ${IND[kb].label}: ${Number(c.raw.y).toFixed(1)}${yu}`;
+        }}
+      }},
+      scales:{
+        x:{title:{display:true,text:`${IND[ka].label} 연간 변화율 (${IND[ka].changeType==='pct'?'%':'%p'})`,font:{size:10}},
+          ticks:{font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}},
+        y:{title:{display:true,text:`${IND[kb].label} 연간 변화율 (${IND[kb].changeType==='pct'?'%':'%p'})`,font:{size:10}},
+          ticks:{font:{size:10}},grid:{color:'rgba(255,255,255,0.05)'}}
+      }
+    }
+  });
+}
+
+// ── Full Update ───────────────────────────────────────────────────────────────
+function update(){
+  renderStats();
+  if(activeTab==='trend')renderTrend();
+  else if(activeTab==='matrix')renderMatrix();
+  else if(activeTab==='rolling')renderRolling();
+  else if(activeTab==='scatter')renderScatter();
+}
+
+function renderActiveTab(){
+  if(activeTab==='trend')renderTrend();
+  else if(activeTab==='matrix')renderMatrix();
+  else if(activeTab==='rolling')renderRolling();
+  else if(activeTab==='scatter')renderScatter();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+// Year selects
+const sySel=document.getElementById('startY'), eySel=document.getElementById('endY');
+DATA.forEach(d=>{
+  sySel.innerHTML+=`<option value="${d.y}"${d.y===1970?' selected':''}>${d.y}</option>`;
+  eySel.innerHTML+=`<option value="${d.y}"${d.y===2025?' selected':''}>${d.y}</option>`;
+});
+
+// Indicator toggles
+const indRow=document.getElementById('indRow');
+Object.entries(IND).forEach(([id,cfg])=>{
+  const el=document.createElement('div');
+  el.className='ind-toggle on';
+  el.style.setProperty('--ic',cfg.color);
+  el.innerHTML=`<div class="dot"></div>${cfg.label}`;
+  el.addEventListener('click',()=>{
+    if(selected.has(id)&&selected.size<=2)return; // min 2
+    if(selected.has(id)){selected.delete(id);el.classList.remove('on');}
+    else{selected.add(id);el.classList.add('on');}
+    updatePairSelects();
+    renderStats();
+    renderActiveTab();
+  });
+  indRow.appendChild(el);
+});
+
+// Controls
+sySel.addEventListener('change',()=>{startY=+sySel.value;update();});
+eySel.addEventListener('change',()=>{endY=+eySel.value;update();});
+document.getElementById('rwSel').addEventListener('change',e=>{rw=+e.target.value;renderRolling();});
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab=btn.dataset.tab;
+    document.getElementById(activeTab).classList.add('active');
+    setTimeout(()=>renderActiveTab(),30);
+  });
+});
+
+// Pair selects
+['rA','rB'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    if(id==='rA')pairRA=e.target.value;else pairRB=e.target.value;
+    renderRolling();
+  });
+});
+['sA','sB'].forEach(id=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    if(id==='sA')pairSA=e.target.value;else pairSB=e.target.value;
+    renderScatter();
+  });
+});
+
+// Boot
+updatePairSelects();
+update();
+</script>
+</body>
+</html>
